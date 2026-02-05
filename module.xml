@@ -1,0 +1,27 @@
+<module>
+	<!-- see reference for "module.xml" here: "https://sangomakb.atlassian.net/wiki/spaces/FP/pages/10289830/FreePBX+Open+Source+-+module.xml" -->
+	<rawname>dinstar-freepbx-sms-router</rawname>
+	<repo>unsupported</repo>
+	<name>SMS Router Module for Dinstar</name>
+	<version>0.1.0</version>
+	<category>Connectivity</category>
+	<publisher>Omar Azmi</publisher>
+	<description>Opens a two-way SMS and MMS routing between a Dinstar sim gateway and a FreePBX instance</description>
+	<info>https://github.com/oazmi-apps/dinstar-freepbx-sms-router</info>
+	<license>Anti-Competition License</license>
+	<licenselink>https://raw.githubusercontent.com/oazmi-apps/dinstar-freepbx-sms-router/refs/heads/main/license.md</licenselink>
+	<!-- TODO?: <updateurl>https://domain.com/module.json</updateurl> -->
+	<supported>13</supported>
+	<depends>
+		<version>17</version>
+	</depends>
+
+	<menuitems>
+		<!-- TODO: is this needed for the GUI? -->
+	</menuitems>
+
+	<changelog>
+		### v0.1.0
+		- initial implementation.
+	</changelog>
+</module>
