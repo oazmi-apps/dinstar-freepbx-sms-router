@@ -1,0 +1,47 @@
+{
+	"exclude": [
+		"./dist/",
+		"./docs/",
+		"./npm/"
+	],
+	"fmt": {
+		"useTabs": true,
+		"semiColons": false,
+		"singleQuote": false,
+		"lineWidth": 800,
+		"proseWrap": "preserve",
+		"include": [
+			"./cmd/",
+			"./pkg/",
+			"./src/",
+			"./test/",
+			"./**/*.md",
+			"./**/*.json",
+			"./**/*.yml",
+			"./**/*.yaml"
+		]
+	},
+	"compilerOptions": {
+		"types": [],
+		"lib": ["esnext"],
+		"strict": true
+	},
+	"tasks": {
+		"build": {
+			"description": "build binaries of this go project",
+			"command": "go build -ldflags=\"-w -s\" -o \"./dist/\" \"./cmd/cli.go\""
+		},
+		"test-register": {
+			"description": "register the binary (placed under your distribution folder) as a startup daemon on linux, or a startup service on windows.",
+			"command": "./dist/cli.exe --register"
+		},
+		"test-unregister": {
+			"description": "unregister the binary from booting up as a daemon/service during startup.",
+			"command": "./dist/cli.exe --unregister"
+		},
+		"test-webhook": {
+			"description": "todo: test the webhook with freepbx.",
+			"command": "todo: how will this even get tested?"
+		}
+	}
+}
