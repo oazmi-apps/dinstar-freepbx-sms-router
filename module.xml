@@ -1,6 +1,6 @@
 <module>
 	<!-- see reference for "module.xml" here: "https://sangomakb.atlassian.net/wiki/spaces/FP/pages/10289830/FreePBX+Open+Source+-+module.xml" -->
-	<rawname>dinstar-freepbx-sms-router</rawname>
+	<rawname>dinstarsms</rawname>
 	<repo>unsupported</repo>
 	<name>SMS Router Module for Dinstar</name>
 	<version>0.1.0</version>
@@ -17,7 +17,7 @@
 	</depends>
 
 	<menuitems>
-		<!-- TODO: is this needed for the GUI? -->
+		<dinstarsms>Dinstar SMS Routing Settings</dinstarsms>
 	</menuitems>
 
 	<changelog>

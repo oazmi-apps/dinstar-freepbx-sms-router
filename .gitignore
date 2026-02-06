@@ -10,16 +10,6 @@
 /dist/
 /out/
 
-# test binary, built with `go test -c`.
-*.test
-
-# go workspace files.
-go.work
-go.work.sum
-
-# environment file.
-.env
-
 # lock files
 /deno.lock
 /go.sum

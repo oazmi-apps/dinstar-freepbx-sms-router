@@ -25,5 +25,9 @@
 	],
 	"xml.format.maxLineWidth": 360,
 	"xml.format.enabled": true,
-	"xml.format.splitAttributes": "preserve"
+	"xml.format.splitAttributes": "preserve",
+	"intelephense.environment.includePaths": [
+		"../freepbx-core/",
+		"../freepbx-framework/"
+	]
 }
