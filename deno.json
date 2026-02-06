@@ -28,8 +28,8 @@
 	},
 	"tasks": {
 		"build": {
-			"description": "build binaries of this go project",
-			"command": "go build -ldflags=\"-w -s\" -o \"./dist/\" \"./cmd/cli.go\""
+			"description": "create an uploadable and installable freepbx addon/module package.",
+			"command": "7z a -ttar \"dinstarsms.tar\" \"./Dinstarsms.class.php\" \"./module.xml\""
 		},
 		"test-register": {
 			"description": "register the binary (placed under your distribution folder) as a startup daemon on linux, or a startup service on windows.",
