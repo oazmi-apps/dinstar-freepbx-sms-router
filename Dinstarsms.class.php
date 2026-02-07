@@ -5,6 +5,7 @@ namespace FreePBX\modules;
 use FreePBX\BMO;
 use FreePBX\PDO;
 use FreePBX\FreePBX_Helpers;
+use FreePBX\modules\Dinstarsms\DigestAuth;
 
 
 class Dinstarsms extends FreePBX_Helpers implements BMO
@@ -85,10 +86,36 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 			http_response_code(400);
 			return ['status' => 'fail', 'message' => 'invalid json provided in POST request\'s body.'];
 		}
-		return [
-			'status' => 'success',
-			'message' => 'sms body was dispatched to the gateway with acknowledgement.'
+
+		// gateway configuration.
+		$gateway_url = 'https://192.168.86.245/api/send_sms';
+		$gateway_username = 'admin';
+		$gateway_password = 'admin123';
+		$gateway_port = 0;
+
+		// preparing the sms data.
+		$sms_data = [
+			'from' => $json_data['from'] ?? '',
+			'to' => $json_data['to'],
+			'port' => $gateway_port,
+			'text' => urldecode($json_data['text']),
 		];
+
+		// sending the sms, using our custom digest authentication procedure.
+		try {
+			$result = DigestAuth::sendSms(
+				$gateway_url,
+				$gateway_username,
+				$gateway_password,
+				$sms_data
+			);
+			return $result;
+		} catch (\Exception $err) {
+			return [
+				'status' => 'error',
+				'message' => $err->getMessage(),
+			];
+		}
 	}
 
 	protected function handleReceiveSms(): array
@@ -120,7 +147,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		// next, we construct the json string that will be attached to the POST payload.
 		$ext->add($context, '_.', '', new \ext_set('JSON_PAYLOAD', '{"to":"${MSG_TO}","from":"${MSG_FROM}","text":"${MSG_BODY}"}'));
 		// now, we set the appropriate content-type for json.
-		$ext->add($context, '_.', '', new \ext_set('CURLOPT(httphdr)', 'Content-Type: application/json'));
+		$ext->add($context, '_.', '', new \ext_set('CURLOPT(header)', 'Content-Type: application/json'));
 		# lastly, we execute the POST request via curl (the presence of the second argument makes it into a post-request).
 		$ext->add($context, '_.', '', new \ext_set('CURL_RESULT', '${CURL(' . $handler_url . ',${JSON_PAYLOAD})}'));
 		// we also relay the message to the actual endpoint, should there be one (so that any custom user receives the message too via pjsip's standard behavior).

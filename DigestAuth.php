@@ -11,7 +11,9 @@
 // the correct way for communicating involves sending a GET request for the initial challenge query,
 // and then sending the POST request once we compute the digest token with our username and password.
 
-class DigestAuthHelper
+namespace FreePBX\modules\Dinstarsms;
+
+class DigestAuth
 {
 	/**
 	 * Computes the digest authentication header string.
@@ -102,7 +104,8 @@ class DigestAuthHelper
 		curl_setopt_array($ch, [
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_HEADER => true,
-			CURLOPT_NOBODY => true, // HEAD request to get headers only
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_SSL_VERIFYHOST => false,
 			CURLOPT_SSL_VERIFYPEER => false,
 			CURLOPT_TIMEOUT => 10,
 		]);
@@ -111,13 +114,13 @@ class DigestAuthHelper
 		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
 		if ($http_code !== 401) {
-			throw new Exception("[getGatewayDigestAuth]: expected first response to be 401 (unauthorized), got {$http_code}.");
+			throw new \Exception("[getGatewayDigestAuth]: expected first response to be 401 (unauthorized), got {$http_code}.");
 		}
 
 		// extract www-authenticate header
 		preg_match('/www-authenticate:\s*(.+)/i', $response, $matches);
 		if (!isset($matches[1])) {
-			throw new Exception("[getGatewayDigestAuth]: expected a digest with challenge text, but got none.");
+			throw new \Exception("[getGatewayDigestAuth]: expected a digest with challenge text, but got none.");
 		}
 
 		$challenge_text = trim($matches[1]);
@@ -160,6 +163,7 @@ class DigestAuthHelper
 				'Content-Type: application/json',
 				"Authorization: {$digest_auth_header}",
 			],
+			CURLOPT_SSL_VERIFYHOST => false,
 			CURLOPT_SSL_VERIFYPEER => false,
 			CURLOPT_TIMEOUT => 10,
 		]);
