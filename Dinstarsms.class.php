@@ -87,19 +87,19 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 			return ['status' => 'fail', 'message' => 'invalid json provided in POST request\'s body.'];
 		}
 
-		// gateway configuration.
+		// configuring the gateway parameters and formatting the sms json payload.
 		$gateway_url = 'https://192.168.86.245/api/send_sms';
 		$gateway_username = 'admin';
 		$gateway_password = 'admin123';
 		$gateway_port = 0;
-
-		// preparing the sms data.
-		$sms_data = [
-			'from' => $json_data['from'] ?? '',
-			'to' => $json_data['to'],
-			'port' => $gateway_port,
-			'text' => urldecode($json_data['text']),
-		];
+		$text = urldecode($json_data['text']);
+		// the `from` and `to` fields do not typically contain pure phone numbers. thus we attempt to remove any common padding material below.
+		$phone_regex = '/^\<?(?<scheme>\w+:)?(?<phone>\+?\d+)(?<domain>@.*)?\>?$/';
+		preg_match($phone_regex, $json_data['from'] ?? '', $matches);
+		$from = $matches['phone'] ?? '';
+		preg_match($phone_regex, $json_data['to'] ?? '', $matches);
+		$to = $matches['phone'] ?? '';
+		$sms_data = ['from' => $from, 'to' => $to, 'port' => $gateway_port, 'text' => $text];
 
 		// sending the sms, using our custom digest authentication procedure.
 		try {
