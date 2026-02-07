@@ -4,23 +4,96 @@ namespace FreePBX\modules;
 
 use FreePBX\BMO;
 use FreePBX\PDO;
-use FreePBX_Helpers;
+use FreePBX\FreePBX_Helpers;
 
 
 class Dinstarsms extends FreePBX_Helpers implements BMO
 {
 	public $freepbx = null;
 	protected $database = null;
+	protected $modulename = 'dinstarsms';
 	protected $context = 'dinstar-sms-handler';
+	protected $sendsmsAjax = 'sendsms';
+	protected $recievesmsAjax = 'recievesms';
 
 	public function __construct($freepbx = null)
 	{
 		if ($freepbx == null) {
-			throw new \Exception("[Dinstarsms]: not given a FreePBX object.");
+			throw new \Exception("[{$this->modulename}]: not given a FreePBX object.");
 		}
 		$this->freepbx 	= $freepbx;
 		$this->database = $freepbx->Database;
 		$this->updateAllExtensions();
+	}
+
+	/** unfortunately, because all freepbx api traffic goes through its slim-based authentication middleware,
+	 * it is not possible to perform a request without a valid session; which is something our sim gateway cannot perform.
+	 * 
+	 * the **only** way I have found that successfully permits public access is via ajax (yuck, I know).
+	 * here's the reference for this technique: "https://sangomakb.atlassian.net/wiki/spaces/FP/pages/10420542/FreePBX+Open+Source+-+BMO+Ajax+Calls#Manually-building-the-AJAX-URL"
+	 * 
+	 * this method simply _sets_ the permission for an incoming ajax command; it does not handle the request.
+	 * only once freepbx verifies that the calling client has appropriate permission,
+	 * does the request pass to the handler, which is performed by the `ajaxHandler` method.
+	 * 
+	 * the endpoint for ajax requests are: "http://${DOMAIN_NAME}/admin/ajax.php?module=${RAWNAME}&command=${COMMAND}"
+	 * 
+	 * @param $req - the command name (either `sendsms`, or `receivesms`).
+	 * @param $setting - settings array to modify (which is where permit unauthenticated commands).
+	 */
+	public function ajaxRequest($req, &$setting)
+	{
+		switch ($req) {
+			case $this->sendsmsAjax:
+			case $this->recievesmsAjax:
+				// disable authentication for this command
+				$setting['authenticate'] = false;
+				// (optional) allow remote access to this command (i.e. not just restricted to localhost).
+				$setting['allowremote'] = true;
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	/** this method handles the `sendsms`, or `receivesms` unauthenticated (public) ajax command,
+	 * and then takes the appropriate action.
+	 * 
+	 * it gets called automatically by freepbx once it has verified that the user has the valid permissions.
+	 */
+	public function ajaxHandler()
+	{
+		switch ($_REQUEST['command']) {
+			case $this->sendsmsAjax:
+				return $this->handleSendSms();
+			case $this->recievesmsAjax:
+				return $this->handleReceiveSms();
+			default:
+				return false;
+		}
+	}
+
+	protected function handleSendSms(): array
+	{
+		if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+			http_response_code(400);
+			return ['status' => 'fail', 'message' => 'only POST method is supported.'];
+		}
+		$raw_input = file_get_contents('php://input');
+		$json_data = json_decode($raw_input, true);
+		if ($json_data === null && json_last_error() !== JSON_ERROR_NONE) {
+			http_response_code(400);
+			return ['status' => 'fail', 'message' => 'invalid json provided in POST request\'s body.'];
+		}
+		return [
+			'status' => 'success',
+			'message' => 'sms body was dispatched to the gateway with acknowledgement.'
+		];
+	}
+
+	protected function handleReceiveSms(): array
+	{
+		return ['status' => 'not implemented yet.'];
 	}
 
 	/** needed for freepbx to discover that we perform a dialplan hook! */
@@ -35,8 +108,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 	public function doDialplanHook(&$ext, $engine, $priority): void
 	{
 		$context = $this->context;
-		// $handler_url = 'http://localhost/admin/modules/dinstarsms/api/outbound.php';
-		$handler_url = 'http://10.0.1.36:3000/freepbx';
+		$handler_url = "http://localhost/admin/ajax.php?module={$this->modulename}&command={$this->sendsmsAjax}";
 		// no-op logging operation.
 		$ext->add($context, '_.', '', new \ext_noop('SIP MESSAGE: from ${MESSAGE(from)} to ${MESSAGE(to)}.'));
 		// first we extract variables from the SIP packet.
