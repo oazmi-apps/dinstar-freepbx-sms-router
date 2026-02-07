@@ -14,6 +14,7 @@
 			"./cmd/",
 			"./pkg/",
 			"./src/",
+			"./utilities/",
 			"./test/",
 			"./**/*.md",
 			"./**/*.json",
@@ -23,7 +24,7 @@
 	},
 	"compilerOptions": {
 		"types": [],
-		"lib": ["esnext"],
+		"lib": ["esnext", "dom", "node"],
 		"strict": true
 	},
 	"tasks": {
