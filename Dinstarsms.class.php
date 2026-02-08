@@ -5,7 +5,7 @@ namespace FreePBX\modules;
 use FreePBX\BMO;
 use FreePBX\PDO;
 use FreePBX\FreePBX_Helpers;
-use FreePBX\modules\Dinstarsms\DigestAuth;
+use FreePBX\modules\Dinstarsms\DispatchMessage;
 
 
 class Dinstarsms extends FreePBX_Helpers implements BMO
@@ -14,8 +14,9 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 	protected $database = null;
 	protected $modulename = 'dinstarsms';
 	protected $context = 'dinstar-sms-handler';
-	protected $sendsmsAjax = 'sendsms';
-	protected $recievesmsAjax = 'recievesms';
+	protected $sendsmsAjax = 'sendsms'; // TODO: should be configurable?
+	protected $receivesmsAjax = 'receivesms'; // TODO: should be configurable?
+	protected $defaultDomain = '10.0.15.36'; // TODO: should be configurable.
 
 	public function __construct($freepbx = null)
 	{
@@ -39,14 +40,14 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 	 * 
 	 * the endpoint for ajax requests are: "http://${DOMAIN_NAME}/admin/ajax.php?module=${RAWNAME}&command=${COMMAND}"
 	 * 
-	 * @param $req - the command name (either `sendsms`, or `receivesms`).
-	 * @param $setting - settings array to modify (which is where permit unauthenticated commands).
+	 * @param string $req - the command name (either `sendsms`, or `receivesms`).
+	 * @param array $setting - settings array to modify (which is where permit unauthenticated commands).
 	 */
-	public function ajaxRequest($req, &$setting)
+	public function ajaxRequest(string $req, array &$setting): bool
 	{
 		switch ($req) {
 			case $this->sendsmsAjax:
-			case $this->recievesmsAjax:
+			case $this->receivesmsAjax:
 				// disable authentication for this command
 				$setting['authenticate'] = false;
 				// (optional) allow remote access to this command (i.e. not just restricted to localhost).
@@ -67,7 +68,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		switch ($_REQUEST['command']) {
 			case $this->sendsmsAjax:
 				return $this->handleSendSms();
-			case $this->recievesmsAjax:
+			case $this->receivesmsAjax:
 				return $this->handleReceiveSms();
 			default:
 				return false;
@@ -91,7 +92,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		$gateway_url = 'https://192.168.86.245/api/send_sms';
 		$gateway_username = 'admin';
 		$gateway_password = 'admin123';
-		$gateway_port = 0;
+		$gateway_port = 0; // TODO: map the user extension number to the appropriate port number.
 		$text = urldecode($json_data['text']);
 		// the `from` and `to` fields do not typically contain pure phone numbers. thus we attempt to remove any common padding material below.
 		$phone_regex = '/^\<?(?<scheme>\w+:)?(?<phone>\+?\d+)(?<domain>@.*)?\>?$/';
@@ -103,7 +104,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 
 		// sending the sms, using our custom digest authentication procedure.
 		try {
-			$result = DigestAuth::sendSms(
+			$result = DispatchMessage::sendSms(
 				$gateway_url,
 				$gateway_username,
 				$gateway_password,
@@ -120,7 +121,43 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 
 	protected function handleReceiveSms(): array
 	{
-		return ['status' => 'not implemented yet.'];
+		if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+			http_response_code(400);
+			return ['status' => 'fail', 'message' => 'only POST method is supported.'];
+		}
+		$raw_input = file_get_contents('php://input');
+		$json_data = json_decode($raw_input, true);
+		if ($json_data === null && json_last_error() !== JSON_ERROR_NONE) {
+			http_response_code(400);
+			return ['status' => 'fail', 'message' => 'invalid json provided in POST request\'s body.'];
+		}
+		if (!isset($json_data['sms'])) {
+			http_response_code(400);
+			return ['status' => 'fail', 'message' => 'missing the "sms" array field in the provided json request body.'];
+		}
+		$any_error = false;
+		$results = array_map(function ($sms_field) use (&$any_error) {
+			$port = $sms_field['port'] ?? -1;
+			$from = $sms_field['number'] ?? '';
+			$to = '1000'; // TODO: map the port to the appropriate user extension number.
+			$text = $sms_field['text'] ?? '';
+			if ($port < 0 || empty($from) || empty($to) || empty($text)) {
+				$any_error = true;
+				return ['status' => 'error', 'message' => "missing one or more required fields: { port: {$port}, number: \"{$from}\", text: \"{$text}\" }"];
+			}
+			$sms_data = ['from' => $from, 'to' => $to, 'text' => $text];
+			// send the message via asterisk.
+			try {
+				return DispatchMessage::receiveSms($this->freepbx, $this->defaultDomain, $sms_data);
+			} catch (\Exception $err) {
+				$any_error = true;
+				return ['status' => 'error', 'message' => $err->getMessage(),];
+			}
+		}, $json_data['sms']);
+		if ($any_error) {
+			http_response_code(400);
+		}
+		return $results;
 	}
 
 	/** needed for freepbx to discover that we perform a dialplan hook! */

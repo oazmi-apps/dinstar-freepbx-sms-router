@@ -30,7 +30,7 @@
 	"tasks": {
 		"build": {
 			"description": "create an uploadable and installable freepbx addon/module package.",
-			"command": "7z a -ttar \"./dist/dinstarsms.tar\" \"./Dinstarsms.class.php\" \"./DigestAuth.php\" \"./module.xml\""
+			"command": "7z a -ttar \"./dist/dinstarsms.tar\" \"./*.php\" \"./module.xml\""
 		},
 		"test-register": {
 			"description": "register the binary (placed under your distribution folder) as a startup daemon on linux, or a startup service on windows.",
