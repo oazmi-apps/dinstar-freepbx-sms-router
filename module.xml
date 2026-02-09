@@ -3,7 +3,7 @@
 	<rawname>dinstarsms</rawname>
 	<repo>unsupported</repo>
 	<name>SMS Router Module for Dinstar</name>
-	<version>0.1.0</version>
+	<version>0.1.1</version>
 	<category>Connectivity</category>
 	<publisher>Omar Azmi</publisher>
 	<description>Opens a two-way SMS and MMS routing between a Dinstar sim gateway and a FreePBX instance</description>
@@ -21,6 +21,9 @@
 	</menuitems>
 
 	<changelog>
+		### v0.1.1
+		- added manual port number and extension number mapping.
+		- added installation instructions.
 		### v0.1.0
 		- initial implementation.
 	</changelog>
