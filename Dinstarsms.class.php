@@ -17,6 +17,25 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 	protected $sendsmsAjax = 'sendsms'; // TODO: should be configurable?
 	protected $receivesmsAjax = 'receivesms'; // TODO: should be configurable?
 	protected $defaultDomain = '10.0.15.36'; // TODO: should be configurable.
+	// sim gateway authentication parameters.
+	public $gatewayUrl = 'https://192.168.86.245/api/send_sms';
+	public $gatewayUsername = 'admin';
+	public $gatewayPassword = 'admin123';
+	// the forward and backwards `port <---> extension` mapping for sms traversal.
+	public $inboundMap = [
+		0 => '1000',
+		1 => '1001',
+		2 => '1002',
+		3 => '1003',
+		4 => '1004',
+	];
+	public $outboundMap = [
+		'1000' => 0,
+		'1001' => 1,
+		'1002' => 2,
+		'1003' => 3,
+		'1004' => 4,
+	];
 
 	public function __construct($freepbx = null)
 	{
@@ -88,26 +107,22 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 			return ['status' => 'fail', 'message' => 'invalid json provided in POST request\'s body.'];
 		}
 
-		// configuring the gateway parameters and formatting the sms json payload.
-		$gateway_url = 'https://192.168.86.245/api/send_sms';
-		$gateway_username = 'admin';
-		$gateway_password = 'admin123';
-		$gateway_port = 0; // TODO: map the user extension number to the appropriate port number.
-		$text = urldecode($json_data['text']);
 		// the `from` and `to` fields do not typically contain pure phone numbers. thus we attempt to remove any common padding material below.
 		$phone_regex = '/^\<?(?<scheme>\w+:)?(?<phone>\+?\d+)(?<domain>@.*)?\>?$/';
 		preg_match($phone_regex, $json_data['from'] ?? '', $matches);
 		$from = $matches['phone'] ?? '';
 		preg_match($phone_regex, $json_data['to'] ?? '', $matches);
 		$to = $matches['phone'] ?? '';
+		$gateway_port = $this->outboundMap[$from];
+		$text = urldecode($json_data['text']);
 		$sms_data = ['from' => $from, 'to' => $to, 'port' => $gateway_port, 'text' => $text];
 
 		// sending the sms, using our custom digest authentication procedure.
 		try {
 			$result = DispatchMessage::sendSms(
-				$gateway_url,
-				$gateway_username,
-				$gateway_password,
+				$this->gatewayUrl,
+				$this->gatewayUsername,
+				$this->gatewayPassword,
 				$sms_data
 			);
 			return $result;
@@ -139,7 +154,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		$results = array_map(function ($sms_field) use (&$any_error) {
 			$port = $sms_field['port'] ?? -1;
 			$from = $sms_field['number'] ?? '';
-			$to = '1000'; // TODO: map the port to the appropriate user extension number.
+			$to = $this->inboundMap[$port];
 			$text = $sms_field['text'] ?? '';
 			if ($port < 0 || empty($from) || empty($to) || empty($text)) {
 				$any_error = true;
