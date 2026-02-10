@@ -27,7 +27,9 @@ and now, the module's tarball will be placed under the `./dist/` folder.
 - now hit the `Upload (From Hard Disk)` button, and then head back to the `Module Updates` tab of the `Admin > Module Admin` page.
 - find the name of this module (`SMS Router Module for Dinstar`), expand the entry by clicking on it,
   and then click on the `Install` button on the `Action` field.
-- scroll all the way up and then click on the `Process` button at the top right of the page, then hit confirm.
+- scroll all the way up and then click on the `Process` button at the top right of the page, then hit `Confirm`.
+- finally, at the top right of the page, you will see a new `Apply Config` orange button show up.
+  click on it for the extension to apply its settings and work.
 
 ### gateway configuration
 
@@ -50,4 +52,4 @@ and the [`framework`](https://github.com/FreePBX/framework), then place them in 
 
 ## version
 
-0.1.1
+0.1.2

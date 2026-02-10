@@ -16,11 +16,13 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 	protected $context = 'dinstar-sms-handler';
 	protected $sendsmsAjax = 'sendsms'; // TODO: should be configurable?
 	protected $receivesmsAjax = 'receivesms'; // TODO: should be configurable?
-	protected $defaultDomain = '10.0.15.36'; // TODO: should be configurable.
-	// sim gateway authentication parameters.
-	public $gatewayUrl = 'https://192.168.86.245/api/send_sms';
-	public $gatewayUsername = 'admin';
-	public $gatewayPassword = 'admin123';
+	protected $defaultConfig = [
+		'sipDomain' => '10.0.15.36',
+		// sim gateway authentication parameters.
+		'gatewayUrl' => 'https://192.168.86.245/api/send_sms',
+		'gatewayUsername' => 'admin',
+		'gatewayPassword' => 'admin123',
+	];
 	// the forward and backwards `port <---> extension` mapping for sms traversal.
 	public $inboundMap = [
 		0 => '1000',
@@ -44,7 +46,13 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		}
 		$this->freepbx 	= $freepbx;
 		$this->database = $freepbx->Database;
-		$this->updateAllExtensions();
+	}
+
+	public function getConfig($key = null, $id = 'noid')
+	{
+		// the returned value for `parent::getConfig` is `false` if undefined. that's a very stupid design choice, but whatever.
+		$saved_value = parent::getConfig($key, $id);
+		return ($saved_value === false) ? $this->defaultConfig[$key] : $saved_value;
 	}
 
 	/** unfortunately, because all freepbx api traffic goes through its slim-based authentication middleware,
@@ -120,9 +128,9 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		// sending the sms, using our custom digest authentication procedure.
 		try {
 			$result = DispatchMessage::sendSms(
-				$this->gatewayUrl,
-				$this->gatewayUsername,
-				$this->gatewayPassword,
+				$this->getConfig('gatewayUrl'),
+				$this->getConfig('gatewayUsername'),
+				$this->getConfig('gatewayPassword'),
 				$sms_data
 			);
 			return $result;
@@ -163,7 +171,7 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 			$sms_data = ['from' => $from, 'to' => $to, 'text' => $text];
 			// send the message via asterisk.
 			try {
-				return DispatchMessage::receiveSms($this->freepbx, $this->defaultDomain, $sms_data);
+				return DispatchMessage::receiveSms($this->freepbx, $this->getConfig('sipDomain'), $sms_data);
 			} catch (\Exception $err) {
 				$any_error = true;
 				return ['status' => 'error', 'message' => $err->getMessage(),];
@@ -234,7 +242,30 @@ class Dinstarsms extends FreePBX_Helpers implements BMO
 		}
 	}
 
-	public function install() {}
+	/** this method is called upon an update in the gui-based settings page of this module (`Connectivity -> Dinstar SMS Routing`). */
+	public function doConfigPageInit($page)
+	{
+		// if the user's http-request is a form submission via POST,
+		// then we assign the user-specified variables to our addon's configs.
+		if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'save') {
+			// assigning a `false` deletes the key.
+			$this->setConfig('sipDomain', $_POST['sipDomain'] ?? false);
+			$this->setConfig('gatewayUrl', $_POST['gatewayUrl'] ?? false);
+			$this->setConfig('gatewayUsername', $_POST['gatewayUsername'] ?? false);
+			$this->setConfig('gatewayPassword', $_POST['gatewayPassword'] ?? false);
+			// TODO: handle port maps.
+			return [
+				"status" => true,
+				"message" => 'configuration saved.'
+			];
+		}
+	}
+
+	public function install()
+	{
+		$this->updateAllExtensions();
+	}
+
 	public function uninstall() {}
 	public function backup() {}
 	public function restore($backup) {}
