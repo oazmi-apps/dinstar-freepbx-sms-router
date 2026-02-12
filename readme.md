@@ -41,6 +41,19 @@ and now, the module's tarball will be placed under the `./dist/` folder.
     will have to be set to the following template, based on what your freepbx's ip-address/hostname is:
     > http://{FREEPBX_DOMAIN}/admin/ajax.php?module=dinstarsms&command=receivesms
 
+### fixing dropped inbound messages
+
+when you have multiple contacts/devices registered to a single extension number,
+only the devices that are immediately online (by asterisk's standards) will receive the message.
+all other, temporarily offline or sleeping devices, will miss the message.
+
+the only reliable way to reduce the chances of this happening (without involving some complex solution, such as google/apple push-notifications),
+is my decreasing the `Keep Alive Interval` in freepbx. to do so, simply:
+
+- log into your freepbx admin portal and navigate to `Settings > Asterisk SIP Settings`.
+- open up the `SIP Settings [chap_pjsip]` tab.
+- search for the `Keep Alive Interval` settings, and change the value from the default `90` seconds to `30`, or `20`.
+
 ## development
 
 to get LSP suggestions, you'll need to clone the [`core`](https://github.com/FreePBX/core) freepbx repo,
@@ -52,4 +65,4 @@ and the [`framework`](https://github.com/FreePBX/framework), then place them in 
 
 ## version
 
-0.1.2
+0.1.3

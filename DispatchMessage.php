@@ -90,7 +90,7 @@ class DispatchMessage
 			$to_domain = self::getExtensionDomainFromContact($freepbx, $to) ?? $default_domain;
 			$from = "sip:{$from}@{$to_domain}";
 		}
-		$result = self::sendSmsToExtension($freepbx, $to, $from, $sms_data['text']);
+		$result = self::sendSmsToExtension($freepbx, $to, $from, $sms_data['text'], true);
 		return [
 			'status' => 'success',
 			'message' => 'sms forwarded to extension number.',
@@ -106,29 +106,51 @@ class DispatchMessage
 	 * @param string $message_text - the raw sms text content to send.
 	 * @return array response from the _asterisk manager interface_.
 	 */
-	protected static function sendSmsToExtension(&$freepbx, string $to_extension, string $from_number, string $message_text): array
+	protected static function sendSmsToExtension(&$freepbx, string $to_extension, string $from_number, string $message_text, bool $send_to_all_contacts = true): array
 	{
 		// this is the _asterisk manager interface_ (aka the AMI)
 		$astman = $freepbx->astman;
 		if (!$astman) {
 			throw new \Exception('[sendSmsToExtension]: unable to discover the Asterisk Manager Interface.');
 		}
-		// we assume that the user-extension uses the pjsip technology and scheme.
-		// TODO: while all new freepbx extensions are based on pjsip, it is not strictly necessary that all of them will be using that.
-		// other sip technologies that are permitted in asterisk are: `chan_pjsip`, and `sip`.
-		$destination = "pjsip:{$to_extension}";
-		$ami_params = [
-			'To' => $destination,
-			'From' => $from_number,
-			'Body' => $message_text,
-		];
-		// dispatching the sms message via the AMI.
-		$response = $astman->send_request('MessageSend', $ami_params);
-		if (!$response || (isset($response['Response']) && $response['Response'] === 'Error')) {
-			$error_msg = $response['Message'] ?? 'unknown error';
-			throw new \Exception("[sendSmsToExtension]: Failed to dispatch message via the Asterisk Manager Interface, due to: {$error_msg}.");
+
+		// if either the caller of this function desires the primary (most recent) contact of the given extension to exclusively receive the message,
+		// or if zero contacts with the given extension are currently online, then we will use asterisk's default `MessageSend` request to handle the message,
+		// otherwise, we will have to dispatch the message to each contact (i.e. endpoint device) one at a time, so that they all receive it.
+		$contacts = [];
+		if ($send_to_all_contacts) {
+			$asterisk_response = $astman->GetVar(null, "PJSIP_DIAL_CONTACTS({$to_extension})"); // note: this function doesn't work unless you provide a channel value (null in this case).
+			// the `$contacts_str` is a string formatted like: `PJSIP/1000/sip:1000@10.0.0.10:5060&PJSIP/1000/sip:1000@10.0.1.35:5060`
+			$contacts_str = (($asterisk_response['Response'] ?? 'Error') === 'Success')
+				? $asterisk_response['Value'] ?? ''
+				: '';
+			$contact_str_arr = empty($contacts_str) ? [] : explode('&', $contacts_str); // string to array split function (what a weird thing to name).
+			$contacts = array_map(function ($contact_str) {
+				// `$contact_str` looks like "PJSIP/1000/sip:1000@10.0.0.10:5060", and we shall transform it to "pjsip:1000/sip:1000@10.0.0.10:5060".
+				return preg_replace('/^PJSIP\//i', 'pjsip:', $contact_str);
+			}, $contact_str_arr);
 		}
-		return $response;
+		// if there are no contacts available, we will let asterisk do its default thing with the message, by setting the device-uri to an empty string.
+		if (empty($contacts)) {
+			$contacts = ["pjsip:{$to_extension}"];
+		}
+
+		$responses = [];
+		foreach ($contacts as $destination) {
+			$ami_params = [
+				'To' => $destination,
+				'From' => $from_number,
+				'Body' => $message_text,
+			];
+			// dispatching the sms message via the AMI.
+			$response = $astman->send_request('MessageSend', $ami_params);
+			if (!$response || (isset($response['Response']) && $response['Response'] === 'Error')) {
+				$error_msg = $response['Message'] ?? 'unknown error';
+				throw new \Exception("[sendSmsToExtension]: Failed to dispatch message via the Asterisk Manager Interface, due to: {$error_msg}.");
+			}
+			array_push($responses, $response);
+		}
+		return $responses;
 	}
 
 	/** try to extract domain from the extension's current PJSIP contact
